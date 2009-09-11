@@ -1,4 +1,4 @@
-#summary krusduino - Fish Tank LED Lightinh controller.
+#summary krusduino - Fish Tank LED Lighting controller.
 
 = Introduction =
 
