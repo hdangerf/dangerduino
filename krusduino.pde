@@ -32,9 +32,7 @@
 #include <avr/interrupt.h>
 
 #include "nokia_3310_lcd.h"
-//#include "avr_bmp.h"
-//#include "hd2_bmp.h"
-//#include "hd3_bmp.h"
+
 #include "whiteblue_bmp.h"
 #include "time_bmp.h"
 #include "degC_bmp.h"
