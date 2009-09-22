@@ -245,7 +245,7 @@ attachInterrupt(0,onesecint, RISING);
 //**********
 
 
-  Serial.println("Aquarium Lighting Control with display  ASK027 16-Sep-09");
+  Serial.println("Aquarium Lighting Control with display  krusduino 22-Sep-09");
   
   //Serial.print(" Clock Status is ->   ");
   //CST = ReadClockStatus();
