@@ -11,6 +11,7 @@
 //
 //  Changes      Date              Details
 //               16.09.09         Added Extras to menu,
+//               20.11.09         1 sec interrupt correction
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -869,7 +870,7 @@ void onesecint()  {
  //ticks++; // every second
  int tickrate;
   if (speedup==1) { tickrate = 3;}
-  else {tickrate = 59;}
+  else {tickrate = 60;}
  ltick++;
 if (ltick>= tickrate) {  //change Here was 20 ********
    ltick = 0;
