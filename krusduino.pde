@@ -4,7 +4,7 @@
 //
 //
 // Purpose: Krusduino   Fish Tank LED Lighting Controller
-
+//
 //
 //
 // Initial version 1.0   15.09.2009
@@ -12,6 +12,7 @@
 //  Changes      Date              Details
 //               16.09.09         Added Extras to menu,
 //               20.11.09         1 sec interrupt correction
+//               24.11.09         Added temperature to LEDTest
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -784,7 +785,7 @@ void menu_about(){
   lcd.LCD_3310_write_string(0, 2, "Arduino by", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 3, "Hugh", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 4, "Dangerfield", MENU_NORMAL);
-  lcd.LCD_3310_write_string(0, 5, "Oct", MENU_NORMAL);
+  lcd.LCD_3310_write_string(0, 5, "Nov", MENU_NORMAL);
   lcd.LCD_3310_write_string(60, 5, "2009", MENU_NORMAL);
   
   lcd.LCD_3310_write_string(30, 5, "OK", MENU_HIGHLIGHT );
@@ -929,7 +930,7 @@ void LCD_write_chars (unsigned char X,unsigned char Y,unsigned char *bmp, int ch
 }
 
 
-void LCD_ReadTemperature(){
+void LCD_ReadTemperature(unsigned int tx, unsigned int ty){
   ReadTemperature();
 dataString="";  //clear string
             if (SignBit) // If its negative
@@ -946,7 +947,7 @@ dataString="";  //clear string
            Fract = Fract/10;
             itoa (Fract,tstr, 10);
             dataString.append(tstr);
-             lcd.LCD_3310_write_string(48, 2, dataString, MENU_NORMAL );
+             lcd.LCD_3310_write_string(tx,ty, dataString, MENU_NORMAL );
 }
  
  
@@ -954,7 +955,7 @@ void LCD_Main_Draw() {
   
    draw_barchart(wled_out, bled_out);
    LCD_write_chars(68,0,whiteblue_bmp,2);
-   LCD_write_chars(78,2, degC_bmp,2);
+   LCD_write_chars(78,2, degC_bmp,1);
   //lcd.LCD_3310_write_byte(0x80, 0);
  // lcd.LCD_3310_write_byte(0x40, 0); //y
  //lcd.LCD_3310_write_byte(0xff, 1);
@@ -991,7 +992,7 @@ dataString.append("-");
  lcd.LCD_3310_write_string(36, 4, dataString, MENU_NORMAL );
  
  
-LCD_ReadTemperature();
+LCD_ReadTemperature(48,2);
  		
 }
 
@@ -1235,9 +1236,12 @@ void LCDSetupLEDTest()
 led1test_out = 0;
 led2test_out = 0;
 draw_barchart(led1test_out, led2test_out);
+LCD_write_chars(68,0,whiteblue_bmp,2);
 
   lcd.LCD_3310_write_string( 0, 1,  "white",MENU_NORMAL );
   lcd.LCD_3310_write_string( 0, 3,  "blue",MENU_NORMAL );
+  LCD_ReadTemperature(0,5);
+  LCD_write_chars(30,5, degC_bmp,1);
   DisplayLEDTest_LEDValues();
   
 
@@ -1284,10 +1288,12 @@ char ledmenu_item = 0;
            
            analogWrite(ledPinWhite, byte(led1test_out));
            analogWrite(ledPinBlue,  byte(led2test_out));
-   
        }
     
-     }
+     
+      }
+     LCD_ReadTemperature(0,5);  //to update temperature whilst in LED Test Mode
+     delay(150);  // don't want to read temperature sensor too quickly
     } //end while loop
 }
 
