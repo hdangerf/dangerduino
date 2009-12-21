@@ -13,6 +13,9 @@
 //               16.09.09         Added Extras to menu,
 //               20.11.09         1 sec interrupt correction
 //               24.11.09         Added temperature to LEDTest
+//               18.12.09         Changed "check" function to make more accuate using floating point, 
+//                                + added serial case S to toggle speedup
+//                                + in serial case D added display clock after setting it
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -247,7 +250,7 @@ attachInterrupt(0,onesecint, RISING);
 //**********
 
 
-  Serial.println("Aquarium Lighting Control with display  krusduino 22-Sep-09");
+  Serial.println("Aquarium Lighting Control with display  r11 21-Dec-09");
   
   //Serial.print(" Clock Status is ->   ");
   //CST = ReadClockStatus();
@@ -328,7 +331,7 @@ void loop() {
 
 		case RIGHT_KEY:
 				// current item to normal display
-		  lcd.LCD_3310_write_string(MENU_X, MENU_Y + current_menu_item, menu_items[current_menu_item], MENU_NORMAL );
+		  //lcd.LCD_3310_write_string(MENU_X, MENU_Y + current_menu_item, menu_items[current_menu_item], MENU_NORMAL );
 		  current_menu_item +=1;
 		  if(current_menu_item >(NUM_MENU_ITEM-1))  current_menu_item = 0;
 					// next item to highlight display
@@ -410,6 +413,9 @@ void messageReady() {
             set_month = message.readInt();
             set_year = message.readInt();      
             SetClock();
+            ReadClock();
+            SerialPrintClock();
+            LCD_Main_Draw();
             break;
             
              
@@ -443,7 +449,14 @@ void messageReady() {
             LoadLEDArray();
              Serial.println(" LED values loaded ");
             break;
-            
+ 
+             case 'S':
+// S Speedup status toggle
+            speedup =! speedup;
+            Serial.print("Speedup Status is  ");
+            Serial.println(speedup);
+            break;
+                     
             
             case 'T': 
 // T Read Temperature
@@ -500,16 +513,22 @@ if (min_cnt>=1440) {min_cnt=1;}   // 24 hours of minutes
     analogWrite(ledPinWhite, wled_out);
     
   }
-byte check( byte *pt1, byte *pt2, int lstep)
+  
+  
+  byte check( byte *pt1, byte *pt2, int lstep)
   {
     byte result;
- 
+    float fresult;
    
     if (*pt1==*pt2) {result = *pt1;}   // No change
     else if (*pt1<*pt2)                //Increasing brightness
-    { result = (((*pt2-*pt1)/15) * lstep)+*pt1;
+    { fresult = ((float(*pt2-*pt1)/15.0) * float(lstep))+float(*pt1);
+     result = byte(fresult);
      }
-    else {result = -(((*pt1-*pt2)/15) * lstep) + *pt1; //Decreasing brightness
+     //Decreasing brightness
+    else {fresult = -((float(*pt1-*pt2)/15.0) * float(lstep))+float(*pt1);
+     result = byte(fresult);
+                     
   }
  
     return result;
@@ -785,8 +804,8 @@ void menu_about(){
   lcd.LCD_3310_write_string(0, 2, "Arduino by", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 3, "Hugh", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 4, "Dangerfield", MENU_NORMAL);
-  lcd.LCD_3310_write_string(0, 5, "Nov", MENU_NORMAL);
-  lcd.LCD_3310_write_string(60, 5, "2009", MENU_NORMAL);
+  lcd.LCD_3310_write_string(0, 5, "r11", MENU_NORMAL);
+  lcd.LCD_3310_write_string(54, 5, "12-09", MENU_NORMAL);
   
   lcd.LCD_3310_write_string(30, 5, "OK", MENU_HIGHLIGHT );
 	waitfor_OKkey();   
