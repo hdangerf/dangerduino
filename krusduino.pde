@@ -16,6 +16,7 @@
 //               18.12.09         Changed "check" function to make more accuate using floating point, 
 //                                + added serial case S to toggle speedup
 //                                + in serial case D added display clock after setting it
+//               3.2.10            Changed dimming values to be an actual useable set
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -64,34 +65,33 @@ int ticks ;
 int ltick;
 int min_cnt ;
 
-
-
+//Dimming values 8am_to_10pm_2hrDawn_2hrDusk_moonlight_75percent
 byte bled[96] = {
   1, 1, 1, 1, 1, 1, 1, 1,  //0 - 1
   1, 1, 1, 1, 1, 1, 1, 1,  //2 - 3
-  1, 1, 1, 1, 3, 15, 15, 15,  //4 - 5
-  0, 0, 0, 0, 0, 0, 0, 0,  //6 - 7
-  30, 50, 70, 90, 110, 130, 130, 130,  //8 - 9
-  150, 150, 150, 230, 230, 230, 230, 230,  //10 - 11
-  230, 230, 230, 230, 230, 230, 230, 230,  //12 - 13
-  230, 230, 230, 230, 230, 230, 230, 230,  //14 - 15
-  230, 230, 230, 230, 230, 230, 230, 230,  //16 - 17
-  110, 90, 70, 50, 30, 10, 10, 10,  //18 - 19
-  1, 1, 1, 1, 1, 1, 1, 1,  //20 - 22
+  1, 1, 1, 1, 1, 1, 1, 1,  //4 - 5
+  1, 1, 1, 1, 1, 1, 1, 1,  //6 - 7
+  1, 16, 32, 55, 80, 110, 140, 190,  //8 - 9
+  190, 190, 190, 190, 190, 190, 190, 190,  //10 - 11
+  190, 190, 190, 190, 190, 190, 190, 190,  //12 - 13
+  190, 190, 190, 190, 190, 190, 190, 190,  //14 - 15
+  190, 190, 190, 190, 190, 190, 190, 190,  //16 - 17
+  190, 190, 190, 190, 190, 190, 190, 190,  //18 - 19
+  190, 110, 90, 70, 55, 32, 16, 1,  //20 - 22
   1, 1, 1, 1, 1, 1, 1, 1    //22 - 23
 };  
 byte wled[96] = {
   0, 0, 0, 0, 0, 0, 0, 0,  //0 - 1
   0, 0, 0, 0, 0, 0, 0, 0,  //2 - 3
-  0, 0, 0, 0, 2, 4, 24, 24,  //4 - 5
+  0, 0, 0, 0, 0, 0, 0, 0,  //4 - 5
   0, 0, 0, 0, 0, 0, 0, 0,  //6 - 7
-  40, 60, 60, 80, 80, 100, 100, 100,  //8 - 9
-  120, 140, 160, 200, 200, 200, 200, 200,  //10 - 11
-  200, 200, 200, 200, 200, 200, 200, 200,  //12 - 13
-  200, 200, 200, 200, 200, 200, 200, 200,  //14 - 15
-  200, 200, 200, 200, 200, 200, 200, 200,  //16 - 17
-  80, 80, 60, 40, 40, 20, 20, 20,  //18 - 19
-  0, 0, 0, 0, 0, 0, 0, 0,  //20 - 22
+  0, 16, 32, 55, 80, 110, 140, 190,  //8 - 9
+  190, 190, 190, 190, 190, 190, 190, 190,  //10 - 11
+  190, 190, 190, 190, 190, 190, 190, 190,  //12 - 13
+  190, 190, 190, 190, 190, 190, 190, 190,  //14 - 15
+  190, 190, 190, 190, 190, 190, 190, 190,  //16 - 17
+  190, 190, 190, 190, 190, 190, 190, 190,  //18 - 19
+  190, 110, 90, 70, 55, 32, 16, 0,  //20 - 22
   0, 0, 0, 0, 0, 0, 0, 0    //22 - 23
 };  //White LED array in RAM
 
@@ -250,7 +250,7 @@ attachInterrupt(0,onesecint, RISING);
 //**********
 
 
-  Serial.println("Aquarium Lighting Control with display  r11 21-Dec-09");
+  Serial.println("Aquarium Lighting Control with display  r12 3-Feb-10");
   
   //Serial.print(" Clock Status is ->   ");
   //CST = ReadClockStatus();
@@ -804,8 +804,8 @@ void menu_about(){
   lcd.LCD_3310_write_string(0, 2, "Arduino by", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 3, "Hugh", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 4, "Dangerfield", MENU_NORMAL);
-  lcd.LCD_3310_write_string(0, 5, "r11", MENU_NORMAL);
-  lcd.LCD_3310_write_string(54, 5, "12-09", MENU_NORMAL);
+  lcd.LCD_3310_write_string(0, 5, "r12", MENU_NORMAL);
+  lcd.LCD_3310_write_string(54, 5, "03-10", MENU_NORMAL);
   
   lcd.LCD_3310_write_string(30, 5, "OK", MENU_HIGHLIGHT );
 	waitfor_OKkey();   
