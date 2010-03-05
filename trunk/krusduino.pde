@@ -17,6 +17,8 @@
 //                                + added serial case S to toggle speedup
 //                                + in serial case D added display clock after setting it
 //               3.2.10            Changed dimming values to be an actual useable set
+//               4.3.10            R13 - Added Mean Well support, tidied up booleans
+//                                 + corrected reading temperature in LED Test Screen
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -46,14 +48,14 @@
 String dataString;
 
 const int TIMER1_F = 5000;  //was 5000
-int debugon = 0;
-int load_from_EEPROM  = 0;
-int speedup  = 0;
+boolean debugon = false;
+boolean load_from_EEPROM  = false;
+boolean speedup  = false;
 
 // for use in setting via LCD keypanel
-int temp_debugon = debugon;
-int temp_load_from_EEPROM  = load_from_EEPROM;
-int temp_speedup  = speedup;
+boolean temp_debugon = debugon;
+boolean temp_load_from_EEPROM  = load_from_EEPROM;
+boolean temp_speedup  = speedup;
 
 
 #define SS 15  //Sector size
@@ -65,6 +67,11 @@ int ticks ;
 int ltick;
 int min_cnt ;
 
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+boolean BUCKPUCK  = true;  //For Mean Well displays change "true" to "false"
+
+//Dimming vales can be changed below
 //Dimming values 8am_to_10pm_2hrDawn_2hrDusk_moonlight_75percent
 byte bled[96] = {
   1, 1, 1, 1, 1, 1, 1, 1,  //0 - 1
@@ -95,6 +102,7 @@ byte wled[96] = {
   0, 0, 0, 0, 0, 0, 0, 0    //22 - 23
 };  //White LED array in RAM
 
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 byte bled_out ;
 byte wled_out ;
 
@@ -250,8 +258,9 @@ attachInterrupt(0,onesecint, RISING);
 //**********
 
 
-  Serial.println("Aquarium Lighting Control with display  r12 3-Feb-10");
-  
+  Serial.println("Aquarium Lighting Control with display  r13 4-Mar-10");
+  if (BUCKPUCK) {Serial.println("Buck Puck configured");}
+  else {Serial.println("Mean Well configured");}
   //Serial.print(" Clock Status is ->   ");
   //CST = ReadClockStatus();
   //Serial.println(CST ,HEX);
@@ -301,7 +310,7 @@ void loop() {
     
     LCD_Main_Draw();
     
-       if (debugon == 1) {Serial.print(" >W ");
+       if (debugon) {Serial.print(" >W ");
        Serial.print(int(wled_out));
        Serial.print(" -B ");
        Serial.print(int(bled_out));
@@ -390,12 +399,12 @@ void messageReady() {
          //pin=pin+1;
         
           mtype = message.readChar();
-          //if (debugon == 1) {Serial.print("Message Available Type -> ");
+          //if (debugon) {Serial.print("Message Available Type -> ");
           //Serial.println(mtype);}
           switch (mtype) {
             case 'C':
 // C   Read clock
-            if (debugon == 1) {Serial.print("Case C Char  --> ");}
+            if (debugon) {Serial.print("Case C Char  --> ");}
             type_char = message.readChar();
             Serial.println(type_char);
             ReadClock();
@@ -404,7 +413,7 @@ void messageReady() {
             
             case 'D':
 // D Set clock
-            if (debugon == 1) {Serial.print("Case D Char  --> ");}
+            if (debugon) {Serial.print("Case D Char  --> ");}
             set_secs = message.readInt();
             set_mins = message.readInt();
             set_hrs = message.readInt();
@@ -438,7 +447,7 @@ void messageReady() {
              E_start_addr = message.readInt();  // get EEPROM start address
              E_value = message.readInt();  // get EEPROM start address 
              EEPROM.write(E_start_addr, E_value);
-             if (debugon == 1) {Serial.print(E_start_addr);
+             if (debugon) {Serial.print(E_start_addr);
              Serial.print(" EEPROM --> ");
              Serial.println(E_value,DEC);}
             break;
@@ -452,16 +461,16 @@ void messageReady() {
  
              case 'S':
 // S Speedup status toggle
-            speedup =! speedup;
+            speedup =  !speedup;
             Serial.print("Speedup Status is  ");
-            Serial.println(speedup);
+            Serial.println(speedup, BIN);
             break;
                      
             
             case 'T': 
 // T Read Temperature
             type_int = message.readInt();
-            if (debugon == 1) {Serial.print("Case T Integer --> ");
+            if (debugon) {Serial.print("Case T Integer --> ");
             Serial.println(type_int);}
             ReadTemperature();
             SerialPrintTemperature();
@@ -470,10 +479,9 @@ void messageReady() {
             
             case 'Z':
 // Z Debug status toggle
-            if (debugon ==1 ) {debugon=0;}
-            else {debugon =1;}
+            debugon = !debugon;
             Serial.print("Debug Status is  ");
-            Serial.println(debugon);
+            Serial.println(debugon, BIN);
             break;
             
             default:
@@ -489,6 +497,7 @@ void messageReady() {
 void LED_levels_output()
 {
 int sector, sstep, t1, t2 ;
+byte b_out, w_out;
 
 if (min_cnt>=1440) {min_cnt=1;}   // 24 hours of minutes
     sector = min_cnt/SS;    // divided by gives sector -- 15 minute
@@ -498,7 +507,7 @@ if (min_cnt>=1440) {min_cnt=1;}   // 24 hours of minutes
     t1 =sector;
     if (t1==95) {t2=0;}
     else {t2 = t1+1;}
-       if (debugon == 1) {Serial.print(t1);
+       if (debugon) {Serial.print(t1);
        Serial.print("__");
        Serial.print(sstep);}
     if (sstep==0)
@@ -509,8 +518,15 @@ if (min_cnt>=1440) {min_cnt=1;}   // 24 hours of minutes
     else { bled_out = check(&bled[t1], &bled[t2], sstep);
           wled_out = check(&wled[t1], &wled[t2], sstep);
     }
-    analogWrite(ledPinBlue, bled_out);
-    analogWrite(ledPinWhite, wled_out);
+    
+    if (BUCKPUCK) {b_out = bled_out;
+                  w_out = wled_out;}
+    
+    else {b_out = 255 - bled_out;
+          w_out = 255 - wled_out;}
+    
+    analogWrite(ledPinBlue, b_out);
+    analogWrite(ledPinWhite, w_out);
     
   }
   
@@ -804,7 +820,7 @@ void menu_about(){
   lcd.LCD_3310_write_string(0, 2, "Arduino by", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 3, "Hugh", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 4, "Dangerfield", MENU_NORMAL);
-  lcd.LCD_3310_write_string(0, 5, "r12", MENU_NORMAL);
+  lcd.LCD_3310_write_string(0, 5, "r13", MENU_NORMAL);
   lcd.LCD_3310_write_string(54, 5, "03-10", MENU_NORMAL);
   
   lcd.LCD_3310_write_string(30, 5, "OK", MENU_HIGHLIGHT );
@@ -1251,6 +1267,7 @@ void LCDSetupLEDTest()
 {
 //led1test_out = wled_out;
 //led2test_out = bled_out;
+byte l1test_out, l2test_out;
 
 led1test_out = 0;
 led2test_out = 0;
@@ -1260,16 +1277,16 @@ LCD_write_chars(68,0,whiteblue_bmp,2);
   lcd.LCD_3310_write_string( 0, 1,  "white",MENU_NORMAL );
   lcd.LCD_3310_write_string( 0, 3,  "blue",MENU_NORMAL );
   LCD_ReadTemperature(0,5);
-  LCD_write_chars(30,5, degC_bmp,1);
   DisplayLEDTest_LEDValues();
+  LCD_write_chars(30,5, degC_bmp,1);
   
-
-char ledmenu_item = 0;
-
- while( 1 ) {
-    LEDTestDrawMenu( ledmenu_item);
-
-  byte i;
+    byte i;
+    char ledmenu_item = 0;
+    unsigned long start_time, time_now, time_elapsed;
+  start_time = millis();
+ while( 1 ) {  
+  LEDTestDrawMenu( ledmenu_item);
+  
   for(i=0; i<NUM_KEYS; i++){
        if(button_flag[i] !=0){
         button_flag[i]=0;  // reset button flag
@@ -1303,16 +1320,25 @@ char ledmenu_item = 0;
           }  // end switch
           draw_barchart(led1test_out, led2test_out);
           DisplayLEDTest_LEDValues();
-          // write PWM vales
-           
-           analogWrite(ledPinWhite, byte(led1test_out));
-           analogWrite(ledPinBlue,  byte(led2test_out));
+          
+          // write PWM vales         
+           if (BUCKPUCK) {l1test_out = led1test_out;
+                        l2test_out = led2test_out;}
+          else {l1test_out = 255 - led1test_out;   // Mean Well Test Values
+                l2test_out = 255 - led2test_out;}
+
+           analogWrite(ledPinWhite, byte(l1test_out));
+           analogWrite(ledPinBlue,  byte(l2test_out));
        }
-    
      
       }
-     LCD_ReadTemperature(0,5);  //to update temperature whilst in LED Test Mode
-     delay(150);  // don't want to read temperature sensor too quickly
+     time_now = millis();
+     time_elapsed = time_now - start_time;
+     if (time_elapsed > 4000)  { LCD_ReadTemperature(0,5);
+                                start_time = millis();
+                              }
+       //to update temperature whilst in LED Test Mode
+       // don't want to read temperature sensor too quickly
     } //end while loop
 }
 
@@ -1477,7 +1503,9 @@ char extrasmenu_item = 0;
          if( extrasmenu_item == 3 ) { 
            debugon = temp_debugon;
            load_from_EEPROM = temp_load_from_EEPROM;
-           if (load_from_EEPROM == 1) {LoadLEDArray();}
+           if (load_from_EEPROM) {LoadLEDArray();
+               load_from_EEPROM = !load_from_EEPROM;
+               temp_load_from_EEPROM = !temp_load_from_EEPROM;}
            speedup = temp_speedup;
            SyncClock();
            
@@ -1501,17 +1529,17 @@ char extrasmenu_item = 0;
 void extrasTestDrawMenu( const char extrasmenu_item)
 {
 //   char extrasstr[ 6 ];
-     if (temp_speedup == 1) {dataString="Y";}
+     if (temp_speedup) {dataString="Y";}
      else   {dataString="N";}
   if( extrasmenu_item == 0 ) {lcd.LCD_3310_write_string(72, 0,  dataString, MENU_HIGHLIGHT );}
   else {lcd.LCD_3310_write_string( 72, 0, dataString, MENU_NORMAL );}
 
-     if (temp_load_from_EEPROM == 1) {dataString="Y";}
+     if (temp_load_from_EEPROM) {dataString="Y";}
      else   {dataString="N";}
   if( extrasmenu_item == 1 ) {lcd.LCD_3310_write_string(72, 1,  dataString, MENU_HIGHLIGHT );}
   else {lcd.LCD_3310_write_string(72, 1,  dataString, MENU_NORMAL );}
  
-       if (temp_debugon == 1) {dataString="Y";}
+       if (temp_debugon) {dataString="Y";}
        else   {dataString="N";}
   if( extrasmenu_item == 2 ) {lcd.LCD_3310_write_string(72, 2,  dataString, MENU_HIGHLIGHT );}
   else {lcd.LCD_3310_write_string(72, 2,  dataString, MENU_NORMAL );}
@@ -1534,16 +1562,15 @@ void extrasTestDrawMenu( const char extrasmenu_item)
 {
   switch( Lmenu_item ) {
            case 0:
-            if (temp_speedup == 1) {temp_speedup = 0;}
-            else   {temp_speedup = 1;}
+             temp_speedup = !temp_speedup;
           break;
+          
           case 1:
-            if (temp_load_from_EEPROM == 1) {temp_load_from_EEPROM = 0;}
-            else   {temp_load_from_EEPROM = 1;}
+            temp_load_from_EEPROM = !temp_load_from_EEPROM;
           break;
+          
           case 2:
-            if (temp_debugon == 1) {temp_debugon = 0;}
-            else   {temp_debugon = 1;}
+            temp_debugon = !temp_debugon;
           break;
 
           default:;
@@ -1554,17 +1581,16 @@ void extrasTestDrawMenu( const char extrasmenu_item)
  void extrasSet_Up_Key(char Rmenu_item)
 {
   switch( Rmenu_item ) {
- case 0:
-            if (temp_speedup == 1) {temp_speedup = 0;}
-            else   {temp_speedup = 1;}
+         case 0:
+         temp_speedup = !temp_speedup;
           break;
+          
           case 1:
-            if (temp_load_from_EEPROM == 1) {temp_load_from_EEPROM = 0;}
-            else   {temp_load_from_EEPROM = 1;}
+          temp_load_from_EEPROM = !temp_load_from_EEPROM;
           break;
+          
           case 2:
-            if (temp_debugon == 1) {temp_debugon = 0;}
-            else   {temp_debugon = 1;}
+          temp_debugon = !temp_debugon;
           break;
 
           default:;
