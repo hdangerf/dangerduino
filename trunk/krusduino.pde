@@ -19,6 +19,8 @@
 //               3.2.10            Changed dimming values to be an actual useable set
 //               4.3.10            R13 - Added Mean Well support, tidied up booleans
 //                                 + corrected reading temperature in LED Test Screen
+//                17.3.10          R13c  testing the Clock Halt Bit resetting and tidy up screen
+//                29.6.10          R14   adding Farenheit support
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -44,6 +46,7 @@
 #include "whiteblue_bmp.h"
 #include "time_bmp.h"
 #include "degC_bmp.h"
+#include "degF_bmp.h"
 
 String dataString;
 
@@ -70,6 +73,7 @@ int min_cnt ;
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 boolean BUCKPUCK  = true;  //For Mean Well displays change "true" to "false"
+boolean CELSIUS  = true;  //For Fahrenheit change "true" to "false"
 
 //Dimming vales can be changed below
 //Dimming values 8am_to_10pm_2hrDawn_2hrDusk_moonlight_75percent
@@ -258,7 +262,7 @@ attachInterrupt(0,onesecint, RISING);
 //**********
 
 
-  Serial.println("Aquarium Lighting Control with display  r13 4-Mar-10");
+  Serial.println("Aquarium Lighting Control with display  r14 29-Jun-10");
   if (BUCKPUCK) {Serial.println("Buck Puck configured");}
   else {Serial.println("Mean Well configured");}
   //Serial.print(" Clock Status is ->   ");
@@ -331,12 +335,13 @@ void loop() {
 
 		case LEFT_KEY:
 			// current item to normal display
-		  lcd.LCD_3310_write_string(MENU_X, MENU_Y + current_menu_item, menu_items[current_menu_item], MENU_NORMAL );
+		  //lcd.LCD_3310_write_string(MENU_X, MENU_Y + current_menu_item, menu_items[current_menu_item], MENU_NORMAL );
 		  current_menu_item -=1;
 		  if(current_menu_item <0)  current_menu_item = NUM_MENU_ITEM -1;
 			// next item to highlight display
 		  lcd.LCD_3310_write_string(MENU_X, MENU_Y, menu_items[current_menu_item], MENU_HIGHLIGHT );
-		  break;
+		  
+                  break;
 
 		case RIGHT_KEY:
 				// current item to normal display
@@ -359,8 +364,8 @@ void loop() {
 		  break;
 
 		 case DOWN_KEY:
-        	     //lcd.LCD_3310_clear();
-		    //(*menu_funcs[current_menu_item])();
+        	     lcd.LCD_3310_clear();
+		    (*menu_funcs[current_menu_item])();
                      lcd.LCD_3310_clear();
 		    init_MENU();
                     LED_levels_output();  
@@ -476,7 +481,15 @@ void messageReady() {
             SerialPrintTemperature();
             
             break;
+
+            case 'U': 
+// U Toggle Temperature Units
+            type_int = message.readInt();
+            CELSIUS = !CELSIUS;
+            ReadTemperature();
+            SerialPrintTemperature();
             
+            break;            
             case 'Z':
 // Z Debug status toggle
             debugon = !debugon;
@@ -622,21 +635,41 @@ void ReadTemperature()
 
             LowByte = OneWireInByte(TEMP_PIN);
             HighByte = OneWireInByte(TEMP_PIN);
-            TReading = (HighByte << 8) + LowByte;
-            SignBit = TReading & 0x8000;  // test most sig bit
-            if (SignBit) // negative
-            {
-              TReading = (TReading ^ 0xffff) + 1; // 2's comp
-            }
-            Tc_100 = (6 * TReading) + TReading / 4;    // multiply by (100 * 0.0625) or 6.25
-            Whole = Tc_100 / 100;  // separate off the whole and fractional portions
-            Fract = Tc_100 % 100;
+//From the datasheet, you basically get the result in 2 bytes:
+//
+//[  7  6  5  4  3   2  1  0 ] low byte
+//[  s  s  s  s  11 10  9  8 ] high byte
+//
+//which is a 2's complement 12-bit number sign-extended to 16-bits. 
+//That means if we tell the compiler it is a 16-bit signed variable (int), it'll treat it like one.
+//
+//Secondly, the temperature in degrees is represented as a fractional number, with the bottom 4-bits being the fraction. Think of it like:
+//
+//[ s s s s v v v v v v v v . f f f f ]
+//
+//So to get it in degrees, we would divide by 16 (2 ^ 4). 
+//If we do that as an integer division, we'd obviously only get the result in whole degrees, 
+//so in this case, we'll divide to create a floating point number.           
+		   
+		   
+            TReading = (HighByte << 8) + LowByte;  //construct sign extended 12-bit value
             
+           float temperature = float(TReading) / 16.0;  //convert 12.4 fractional result to float
+		   
+		if (!CELSIUS) { temperature = (temperature*1.8) + 32.0;}		// Convert to Farenheit if required
+		// For use in displaying on the LCD screen
+		// Get sign bit
+        if (temperature<0) {SignBit = 1;}
+          else {SignBit = 0;}
+		  // separate off the whole and fractional portions
+          Whole = int(temperature);
+          Fract = int((temperature - float(Whole))*100);       
 } 
 
 void SerialPrintTemperature ()
 { 
-  Serial.print("Temperature in Deg. C  --> ");
+  if (CELSIUS) {Serial.print("Temperature in Deg. C  --> ");}
+  else {Serial.print("Temperature in Deg. F  --> ");}
             if (SignBit) // If its negative
             {
              Serial.print("-");
@@ -722,10 +755,25 @@ byte ReadClockStatus()
 
 void SetClockStatus ()
 {
+  byte ch_secs;
+  
+  // now clear CH bit - bit 7 in seconds register
+  
+  Wire.beginTransmission(0x68);
+  Wire.send(0);
+  Wire.endTransmission();
+  Wire.requestFrom(0x68, 1);
+  ch_secs = Wire.receive();
+  ch_secs = ch_secs & B01111111;  // mask bit 7 in seconds register
   Wire.beginTransmission(0x68); // activate DS1307
-Wire.send(7); // where to begin
-Wire.send(0x10); // Control 0x10 produces a 1 HZ square wave on pin 7.
-Wire.endTransmission();
+  Wire.send(0);
+  Wire.send(ch_secs); // clear CH bit in DS1307
+  Wire.endTransmission();
+  delay(10);
+  Wire.beginTransmission(0x68); // activate DS1307
+  Wire.send(7); // where to begin
+  Wire.send(0x10); // Control 0x10 produces a 1 HZ square wave on pin 7.
+  Wire.endTransmission();
 }
 
 void SetClock()
@@ -793,7 +841,7 @@ void waitfor_OKkey(){
 void menu_main()
 {
         
-	waitfor_OKkey();
+	//waitfor_OKkey();
 }
 
 
@@ -820,8 +868,8 @@ void menu_about(){
   lcd.LCD_3310_write_string(0, 2, "Arduino by", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 3, "Hugh", MENU_NORMAL);
   lcd.LCD_3310_write_string(0, 4, "Dangerfield", MENU_NORMAL);
-  lcd.LCD_3310_write_string(0, 5, "r13", MENU_NORMAL);
-  lcd.LCD_3310_write_string(54, 5, "03-10", MENU_NORMAL);
+  lcd.LCD_3310_write_string(0, 5, "r14", MENU_NORMAL);
+  lcd.LCD_3310_write_string(54, 5, "06-10", MENU_NORMAL);
   
   lcd.LCD_3310_write_string(30, 5, "OK", MENU_HIGHLIGHT );
 	waitfor_OKkey();   
@@ -990,7 +1038,8 @@ void LCD_Main_Draw() {
   
    draw_barchart(wled_out, bled_out);
    LCD_write_chars(68,0,whiteblue_bmp,2);
-   LCD_write_chars(78,2, degC_bmp,1);
+   if (CELSIUS) {LCD_write_chars(78,2, degC_bmp,1);}
+   else {LCD_write_chars(78,2, degF_bmp,1);}
   //lcd.LCD_3310_write_byte(0x80, 0);
  // lcd.LCD_3310_write_byte(0x40, 0); //y
  //lcd.LCD_3310_write_byte(0xff, 1);
@@ -1278,7 +1327,9 @@ LCD_write_chars(68,0,whiteblue_bmp,2);
   lcd.LCD_3310_write_string( 0, 3,  "blue",MENU_NORMAL );
   LCD_ReadTemperature(0,5);
   DisplayLEDTest_LEDValues();
-  LCD_write_chars(30,5, degC_bmp,1);
+  if (CELSIUS) {LCD_write_chars(30,5, degC_bmp,1);}
+  else {LCD_write_chars(30,5, degF_bmp,1);}
+  
   
     byte i;
     char ledmenu_item = 0;
